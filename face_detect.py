@@ -272,6 +272,7 @@ def build_model():
     facetracker = Model(inputs=input_layer, outputs=[class_output, regress_output])
     return facetracker
 
+# Testing neural network
 facetracker = build_model()
 facetracker.summary()
 X, y = train.as_numpy_iterator().next()
@@ -302,62 +303,61 @@ def localization_loss(y_true, yhat):
     
     return delta_coord + delta_size
 
-
 classloss = tf.keras.losses.BinaryCrossentropy()
 regressloss = localization_loss
 
-# class FaceTracker(Model): 
-#     def __init__(self, eyetracker, **kwargs): 
-#         super(FaceTracker, self).__init__(**kwargs)
-#         self.model = eyetracker
+# Testing out the loss metrics
+print(localization_loss(y[1], coords))
+print(classloss(y[0], classes))
+print(regressloss(y[1], coords))
 
-#     def compile(self, optimizer, class_loss, regression_loss, **kwargs):
-#         super(FaceTracker, self).compile(**kwargs)
-#         self.class_loss = class_loss
-#         self.regression_loss = regression_loss
-#         self.optimizer = optimizer
+# FaceTracekr model class
+class FaceTracker(Model): 
+    def __init__(self, facetracker,  **kwargs): 
+        super().__init__(**kwargs)
+        self.model = facetracker
+
+    def compile(self, optimizer, classloss, localizationloss, **kwargs):
+        super().compile(**kwargs)
+        self.closs = classloss
+        self.lloss = localizationloss
+        self.optimizer = optimizer
     
-#     def train_step(self, batch, **kwargs): 
-#         X, y = batch
+    def train_step(self, batch, **kwargs): 
         
-#         with tf.GradientTape() as tape: 
-#             classes, coords = self.model(X, training=True)
-            
-#             batch_class_loss = self.class_loss(y[0], classes)
-#             batch_regression_loss = self.regression_loss(tf.cast(y[1], tf.float32), coords)
-            
-#             total_loss = batch_regression_loss + 0.5 * batch_class_loss
-            
-#             gradients = tape.gradient(total_loss, self.model.trainable_variables)
+        X, y = batch
         
-#         self.optimizer.apply_gradients(zip(gradients, self.model.trainable_variables))
+        with tf.GradientTape() as tape: 
+            classes, coords = self.model(X, training=True)
+            
+            batch_classloss = self.closs(y[0], classes)
+            batch_localizationloss = self.lloss(tf.cast(y[1], tf.float32), coords)
+            
+            total_loss = batch_localizationloss+0.5*batch_classloss
+            
+            grad = tape.gradient(total_loss, self.model.trainable_variables)
         
-#         return {"total_loss": total_loss, "class_loss": batch_class_loss, "regress_loss": batch_regression_loss}
+        opt.apply_gradients(zip(grad, self.model.trainable_variables))
+        
+        return {"total_loss":total_loss, "class_loss":batch_classloss, "regress_loss":batch_localizationloss}
     
-#     def test_step(self, batch, **kwargs): 
-#         X, y = batch
+    def test_step(self, batch, **kwargs): 
+        X, y = batch
         
-#         classes, coords = self.model(X, training=False)
+        classes, coords = self.model(X, training=False)
         
-#         batch_class_loss = self.class_loss(y[0], classes)
-#         batch_regression_loss = self.regression_loss(tf.cast(y[1], tf.float32), coords)
-#         total_loss = batch_regression_loss + 0.5 * batch_class_loss
+        batch_classloss = self.closs(y[0], classes)
+        batch_localizationloss = self.lloss(tf.cast(y[1], tf.float32), coords)
+        total_loss = batch_localizationloss+0.5*batch_classloss
         
-#         return {"total_loss": total_loss, "class_loss": batch_class_loss, "regress_loss": batch_regression_loss}
+        return {"total_loss":total_loss, "class_loss":batch_classloss, "regress_loss":batch_localizationloss}
         
-#     def call(self, X, **kwargs): 
-#         return self.model(X, **kwargs)
-        
-# model = FaceTracker(facetracker)
-# model.compile(opt, classloss, regressloss)
+    def call(self, X, **kwargs): 
+        return self.model(X, **kwargs)
 
 # Build the model using the build_model function
-face_tracker = build_model()
-face_tracker.compile(
-    optimizer=opt,
-    loss={'classification': classloss,
-        'regression': regressloss}
-)
+face_tracker = FaceTracker(facetracker)
+face_tracker.compile(optimizer, classloss, regressloss)
 
 # Train the model using fit method
 logdir='logs'
