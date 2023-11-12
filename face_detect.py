@@ -256,19 +256,20 @@ vgg.summary()
 def build_model(): 
     input_layer = Input(shape=(120,120,3))
     
+    # Feature extraction using VGG16
     vgg = VGG16(include_top=False)(input_layer)
 
-    # Classification Model  
-    f1 = GlobalMaxPooling2D()(vgg)
-    class1 = Dense(2048, activation='relu')(f1)
-    class2 = Dense(1, activation='sigmoid')(class1)
+    # Classification branch 
+    class_f = GlobalMaxPooling2D()(vgg)
+    class_dense = Dense(2048, activation='relu')(class_f)
+    class_output = Dense(1, activation='sigmoid', name='classification')(class_dense)
     
-    # Bounding box model
-    f2 = GlobalMaxPooling2D()(vgg)
-    regress1 = Dense(2048, activation='relu')(f2)
-    regress2 = Dense(4, activation='sigmoid')(regress1)
+    # Bounding box branch
+    regress_f = GlobalMaxPooling2D()(vgg)
+    regress_dense = Dense(2048, activation='relu')(regress_f)
+    regress_output = Dense(4, activation='sigmoid', name='regression')(regress_dense)
     
-    facetracker = Model(inputs=input_layer, outputs=[class2, regress2])
+    facetracker = Model(inputs=input_layer, outputs=[class_output, regress_output])
     return facetracker
 
 facetracker = build_model()
@@ -279,11 +280,12 @@ classes, coords = facetracker.predict(X)
 print(classes, coords)
 
 batches_per_epoch = len(train)
+lr_decay = (1./0.75 - 1) / batches_per_epoch
 initial_learning_rate = 0.0001
 
 # Define a learning rate schedule with ExponentialDecay
 lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
-initial_learning_rate, decay_steps = batches_per_epoch, decay_rate = 0.75, staircase = False)
+initial_learning_rate, decay_steps = batches_per_epoch, decay_rate = lr_decay, staircase = False)
 
 opt = tf.keras.optimizers.Adam(learning_rate = lr_schedule)
 
@@ -304,74 +306,116 @@ def localization_loss(y_true, yhat):
 classloss = tf.keras.losses.BinaryCrossentropy()
 regressloss = localization_loss
 
-class FaceTracker(Model): 
-    def __init__(self, eyetracker,  **kwargs): 
-        super().__init__(**kwargs)
-        self.model = eyetracker
+# class FaceTracker(Model): 
+#     def __init__(self, eyetracker, **kwargs): 
+#         super(FaceTracker, self).__init__(**kwargs)
+#         self.model = eyetracker
 
-    def compile(self, opt, classloss, localizationloss, **kwargs):
-        super().compile(**kwargs)
-        self.closs = classloss
-        self.lloss = localizationloss
-        self.opt = opt
+#     def compile(self, optimizer, class_loss, regression_loss, **kwargs):
+#         super(FaceTracker, self).compile(**kwargs)
+#         self.class_loss = class_loss
+#         self.regression_loss = regression_loss
+#         self.optimizer = optimizer
     
-    def train_step(self, batch, **kwargs): 
+#     def train_step(self, batch, **kwargs): 
+#         X, y = batch
         
-        X, y = batch
-        
-        with tf.GradientTape() as tape: 
-            classes, coords = self.model(X, training=True)
+#         with tf.GradientTape() as tape: 
+#             classes, coords = self.model(X, training=True)
             
-            batch_classloss = self.closs(y[0], classes)
-            batch_localizationloss = self.lloss(tf.cast(y[1], tf.float32), coords)
+#             batch_class_loss = self.class_loss(y[0], classes)
+#             batch_regression_loss = self.regression_loss(tf.cast(y[1], tf.float32), coords)
             
-            total_loss = batch_localizationloss+0.5*batch_classloss
+#             total_loss = batch_regression_loss + 0.5 * batch_class_loss
             
-            grad = tape.gradient(total_loss, self.model.trainable_variables)
+#             gradients = tape.gradient(total_loss, self.model.trainable_variables)
         
-        opt.apply_gradients(zip(grad, self.model.trainable_variables))
+#         self.optimizer.apply_gradients(zip(gradients, self.model.trainable_variables))
         
-        return {"total_loss":total_loss, "class_loss":batch_classloss, "regress_loss":batch_localizationloss}
+#         return {"total_loss": total_loss, "class_loss": batch_class_loss, "regress_loss": batch_regression_loss}
     
-    def test_step(self, batch, **kwargs): 
-        X, y = batch
+#     def test_step(self, batch, **kwargs): 
+#         X, y = batch
         
-        classes, coords = self.model(X, training=False)
+#         classes, coords = self.model(X, training=False)
         
-        batch_classloss = self.closs(y[0], classes)
-        batch_localizationloss = self.lloss(tf.cast(y[1], tf.float32), coords)
-        total_loss = batch_localizationloss+0.5*batch_classloss
+#         batch_class_loss = self.class_loss(y[0], classes)
+#         batch_regression_loss = self.regression_loss(tf.cast(y[1], tf.float32), coords)
+#         total_loss = batch_regression_loss + 0.5 * batch_class_loss
         
-        return {"total_loss":total_loss, "class_loss":batch_classloss, "regress_loss":batch_localizationloss}
+#         return {"total_loss": total_loss, "class_loss": batch_class_loss, "regress_loss": batch_regression_loss}
         
-    def call(self, X, **kwargs): 
-        return self.model(X, **kwargs)
-model = FaceTracker(facetracker)
-model.compile(opt, classloss, regressloss)
+#     def call(self, X, **kwargs): 
+#         return self.model(X, **kwargs)
+        
+# model = FaceTracker(facetracker)
+# model.compile(opt, classloss, regressloss)
 
+# Build the model using the build_model function
+face_tracker = build_model()
+face_tracker.compile(
+    optimizer=opt,
+    loss={'classification': classloss,
+        'regression': regressloss}
+)
+
+# Train the model using fit method
 logdir='logs'
 tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=logdir)
-# hist = model.fit(train, epochs=10, validation_data=val, callbacks=[tensorboard_callback])
+hist = face_tracker.fit(train, epochs=10, validation_data=val, callbacks=[tensorboard_callback])
 
-# hist.history
-# fig, ax = plt.subplots(ncols=3, figsize=(20,5))
+fig, ax = plt.subplots(ncols=3, figsize=(20, 5))
 
-# ax[0].plot(hist.history['total_loss'], color='teal', label='loss')
-# ax[0].plot(hist.history['val_total_loss'], color='orange', label='val loss')
-# ax[0].title.set_text('Loss')
-# ax[0].legend()
+# Plotting Total Loss
+ax[0].plot(hist.history['total_loss'], label='Training Loss')
+ax[0].plot(hist.history['val_total_loss'], label='Validation Loss')
+ax[0].set_title('Total Loss')
+ax[0].set_xlabel('Epoch')
+ax[0].set_ylabel('Loss')
+ax[0].legend()
 
-# ax[1].plot(hist.history['class_loss'], color='teal', label='class loss')
-# ax[1].plot(hist.history['val_class_loss'], color='orange', label='val class loss')
-# ax[1].title.set_text('Classification Loss')
-# ax[1].legend()
+# Plotting Classification Loss
+ax[1].plot(hist.history['class_loss'], label='Training Class Loss')
+ax[1].plot(hist.history['val_class_loss'], label='Validation Class Loss')
+ax[1].set_title('Classification Loss')
+ax[1].set_xlabel('Epoch')
+ax[1].set_ylabel('Loss')
+ax[1].legend()
 
-# ax[2].plot(hist.history['regress_loss'], color='teal', label='regress loss')
-# ax[2].plot(hist.history['val_regress_loss'], color='orange', label='val regress loss')
-# ax[2].title.set_text('Regression Loss')
-# ax[2].legend()
+# Plotting Regression Loss
+ax[2].plot(hist.history['regress_loss'], label='Training Regression Loss')
+ax[2].plot(hist.history['val_regress_loss'], label='Validation Regression Loss')
+ax[2].set_title('Regression Loss')
+ax[2].set_xlabel('Epoch')
+ax[2].set_ylabel('Loss')
+ax[2].legend()
 
-# plt.show()
+# Adding a main title to the entire graph
+fig.suptitle('Training and Validation Loss Over Epochs')
+
+plt.show()
+
+# Save the trained FaceTracker model to a file
+face_tracker.save('cnn_face_detection_model.keras')
+
+# Load the saved FaceTracker model from the file
+face_tracker = load_model('cnn_face_detection_model.keras')
+
+# Compile the loaded model with optimizer, loss functions, and metrics
+face_tracker.compile(
+    optimizer=tf.keras.optimizers.Adam(learning_rate=1e-4),
+    loss={
+        'classification': tf.keras.losses.BinaryCrossentropy(),
+        'regression': localization_loss
+    },
+    metrics={
+        'classification': [
+            tf.keras.metrics.BinaryAccuracy(),
+            tf.keras.metrics.FalseNegatives()
+        ],
+        'regression': localization_loss
+    }
+)
 
 # making predictions on test set
 test_data = test.as_numpy_iterator()
@@ -391,43 +435,39 @@ for idx in range(4):
     ax[idx].imshow(sample_image)
 plt.show()
 
-
-facetracker.save('facetracker.h5')
-facetracker = load_model('facetracker.h5')
-
-cap = cv2.VideoCapture(0)
-while cap.isOpened():
-    _ , frame = cap.read()
-    frame = frame[50:500, 50:500,:]
+# cap = cv2.VideoCapture(0)
+# while cap.isOpened():
+#     _ , frame = cap.read()
+#     frame = frame[50:500, 50:500,:]
     
-    rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-    resized = tf.image.resize(rgb, (120,120))
+#     rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+#     resized = tf.image.resize(rgb, (120,120))
     
-    yhat = facetracker.predict(np.expand_dims(resized/255,0))
-    sample_coords = yhat[1][0]
+#     yhat = facetracker.predict(np.expand_dims(resized/255,0))
+#     sample_coords = yhat[1][0]
     
-    if yhat[0] > 0.5: 
-        # Controls the main rectangle
-        cv2.rectangle(frame, 
-                      tuple(np.multiply(sample_coords[:2], [450,450]).astype(int)),
-                      tuple(np.multiply(sample_coords[2:], [450,450]).astype(int)), 
-                            (255,0,0), 2)
-        # Controls the label rectangle
-        cv2.rectangle(frame, 
-                      tuple(np.add(np.multiply(sample_coords[:2], [450,450]).astype(int), 
-                                    [0,-30])),
-                      tuple(np.add(np.multiply(sample_coords[:2], [450,450]).astype(int),
-                                    [80,0])), 
-                            (255,0,0), -1)
+#     if yhat[0] > 0.5: 
+#         # Controls the main rectangle
+#         cv2.rectangle(frame, 
+#                       tuple(np.multiply(sample_coords[:2], [450,450]).astype(int)),
+#                       tuple(np.multiply(sample_coords[2:], [450,450]).astype(int)), 
+#                             (255,0,0), 2)
+#         # Controls the label rectangle
+#         cv2.rectangle(frame, 
+#                       tuple(np.add(np.multiply(sample_coords[:2], [450,450]).astype(int), 
+#                                     [0,-30])),
+#                       tuple(np.add(np.multiply(sample_coords[:2], [450,450]).astype(int),
+#                                     [80,0])), 
+#                             (255,0,0), -1)
         
-        # Controls the text rendered
-        cv2.putText(frame, 'face', tuple(np.add(np.multiply(sample_coords[:2], [450,450]).astype(int),
-                                               [0,-5])),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1, (255,255,255), 2, cv2.LINE_AA)
+#         # Controls the text rendered
+#         cv2.putText(frame, 'face', tuple(np.add(np.multiply(sample_coords[:2], [450,450]).astype(int),
+#                                                [0,-5])),
+#                     cv2.FONT_HERSHEY_SIMPLEX, 1, (255,255,255), 2, cv2.LINE_AA)
     
-    cv2.imshow('EyeTrack', frame)
+#     cv2.imshow('EyeTrack', frame)
     
-    if cv2.waitKey(1) & 0xFF == ord('q'):
-        break
-cap.release()
-cv2.destroyAllWindows()
+#     if cv2.waitKey(1) & 0xFF == ord('q'):
+#         break
+# cap.release()
+# cv2.destroyAllWindows()
