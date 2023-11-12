@@ -354,28 +354,28 @@ model.compile(opt, classloss, regressloss)
 
 logdir='logs'
 tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=logdir)
-hist = model.fit(train, epochs=10, validation_data=val, callbacks=[tensorboard_callback])
+# hist = model.fit(train, epochs=10, validation_data=val, callbacks=[tensorboard_callback])
 
-fig, ax = plt.subplots(ncols=3, figsize=(20,5))
+# fig, ax = plt.subplots(ncols=3, figsize=(20,5))
 
-ax[0].plot(hist.history['total_loss'], color='teal', label='loss')
-ax[0].plot(hist.history['val_total_loss'], color='orange', label='val loss')
-ax[0].title.set_text('Total Loss')
-ax[0].legend()
+# ax[0].plot(hist.history['total_loss'], color='teal', label='loss')
+# ax[0].plot(hist.history['val_total_loss'], color='orange', label='val loss')
+# ax[0].title.set_text('Total Loss')
+# ax[0].legend()
 
-ax[1].plot(hist.history['class_loss'], color='teal', label='class loss')
-ax[1].plot(hist.history['val_class_loss'], color='orange', label='val class loss')
-ax[1].title.set_text('Classification Loss')
-ax[1].legend()
+# ax[1].plot(hist.history['class_loss'], color='teal', label='class loss')
+# ax[1].plot(hist.history['val_class_loss'], color='orange', label='val class loss')
+# ax[1].title.set_text('Classification Loss')
+# ax[1].legend()
 
-ax[2].plot(hist.history['regress_loss'], color='teal', label='regress loss')
-ax[2].plot(hist.history['val_regress_loss'], color='orange', label='val regress loss')
-ax[2].title.set_text('Regression Loss')
-ax[2].legend()
+# ax[2].plot(hist.history['regress_loss'], color='teal', label='regress loss')
+# ax[2].plot(hist.history['val_regress_loss'], color='orange', label='val regress loss')
+# ax[2].title.set_text('Regression Loss')
+# ax[2].legend()
 
-plt.show()
+# plt.show()
 
-facetracker.save('cnn_face_detection_model.keras')
+# facetracker.save('cnn_face_detection_model.keras')
 facetracker = load_model('cnn_face_detection_model.keras')
 facetracker.compile(
     optimizer=tf.keras.optimizers.Adam(learning_rate=1e-4),
