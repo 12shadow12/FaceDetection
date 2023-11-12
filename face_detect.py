@@ -288,7 +288,7 @@ initial_learning_rate = 0.0001
 lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
 initial_learning_rate, decay_steps = batches_per_epoch, decay_rate = lr_decay, staircase = False)
 
-opt = tf.keras.optimizers.Adam(learning_rate = lr_schedule)
+optimizer = tf.keras.optimizers.Adam(learning_rate = lr_schedule)
 
 def localization_loss(y_true, yhat):            
     delta_coord = tf.reduce_sum(tf.square(y_true[:,:2] - yhat[:,:2]))
@@ -362,7 +362,7 @@ face_tracker.compile(optimizer, classloss, regressloss)
 # Train the model using fit method
 logdir='logs'
 tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=logdir)
-hist = face_tracker.fit(train, epochs=10, validation_data=val, callbacks=[tensorboard_callback])
+hist = face_tracker.fit(train, epochs=15, validation_data=val, callbacks=[tensorboard_callback])
 
 fig, ax = plt.subplots(ncols=3, figsize=(20, 5))
 
