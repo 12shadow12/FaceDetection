@@ -337,7 +337,7 @@ class FaceTracker(Model):
             
             grad = tape.gradient(total_loss, self.model.trainable_variables)
         
-        opt.apply_gradients(zip(grad, self.model.trainable_variables))
+        optimizer.apply_gradients(zip(grad, self.model.trainable_variables))
         
         return {"total_loss":total_loss, "class_loss":batch_classloss, "regress_loss":batch_localizationloss}
     
