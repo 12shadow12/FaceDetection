@@ -311,7 +311,7 @@ print(localization_loss(y[1], coords))
 print(classloss(y[0], classes))
 print(regressloss(y[1], coords))
 
-# FaceTracekr model class
+# FaceTraceker model class
 class FaceTracker(Model): 
     def __init__(self, facetracker,  **kwargs): 
         super().__init__(**kwargs)
@@ -333,7 +333,7 @@ class FaceTracker(Model):
             batch_classloss = self.closs(y[0], classes)
             batch_localizationloss = self.lloss(tf.cast(y[1], tf.float32), coords)
             
-            total_loss = batch_localizationloss+0.5*batch_classloss
+            total_loss = batch_localizationloss + 0.5 * batch_classloss
             
             grad = tape.gradient(total_loss, self.model.trainable_variables)
         
@@ -356,13 +356,13 @@ class FaceTracker(Model):
         return self.model(X, **kwargs)
 
 # Build the model using the build_model function
-face_tracker = FaceTracker(facetracker)
-face_tracker.compile(optimizer, classloss, regressloss)
+model = FaceTracker(facetracker)
+model.compile(optimizer, classloss, regressloss)
 
 # Train the model using fit method
 logdir='logs'
 tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=logdir)
-hist = face_tracker.fit(train, epochs=15, validation_data=val, callbacks=[tensorboard_callback])
+hist = model.fit(train, epochs=1, validation_data=val, callbacks=[tensorboard_callback])
 
 fig, ax = plt.subplots(ncols=3, figsize=(20, 5))
 
@@ -396,13 +396,13 @@ fig.suptitle('Training and Validation Loss Over Epochs')
 plt.show()
 
 # Save the trained FaceTracker model to a file
-face_tracker.save('cnn_face_detection_model.keras')
+model.save('cnn_face_detection_model.keras')
 
 # Load the saved FaceTracker model from the file
-face_tracker = load_model('cnn_face_detection_model.keras')
+facetracker = load_model('cnn_face_detection_model.keras')
 
 # Compile the loaded model with optimizer, loss functions, and metrics
-face_tracker.compile(
+facetracker.compile(
     optimizer=tf.keras.optimizers.Adam(learning_rate=1e-4),
     loss={
         'classification': tf.keras.losses.BinaryCrossentropy(),
