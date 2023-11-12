@@ -354,7 +354,7 @@ model.compile(opt, classloss, regressloss)
 
 logdir='logs'
 tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=logdir)
-hist = model.fit(train, epochs=1, validation_data=val, callbacks=[tensorboard_callback])
+hist = model.fit(train, epochs=10, validation_data=val, callbacks=[tensorboard_callback])
 
 fig, ax = plt.subplots(ncols=3, figsize=(20,5))
 
