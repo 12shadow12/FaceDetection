@@ -272,7 +272,6 @@ def build_model():
     facetracker = Model(inputs=input_layer, outputs=[class_output, regress_output])
     return facetracker
 
-# Testing neural network
 facetracker = build_model()
 facetracker.summary()
 X, y = train.as_numpy_iterator().next()
@@ -281,14 +280,14 @@ classes, coords = facetracker.predict(X)
 print(classes, coords)
 
 batches_per_epoch = len(train)
-lr_decay = (1./0.75 - 1) / batches_per_epoch
+#lr_decay = (1./0.75 - 1) / batches_per_epoch
 initial_learning_rate = 0.0001
 
 # Define a learning rate schedule with ExponentialDecay
 lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
-initial_learning_rate, decay_steps = batches_per_epoch, decay_rate = lr_decay, staircase = False)
+initial_learning_rate, decay_steps = batches_per_epoch, decay_rate = 0.75, staircase = False)
 
-optimizer = tf.keras.optimizers.Adam(learning_rate = lr_schedule)
+opt = tf.keras.optimizers.Adam(learning_rate = lr_schedule)
 
 def localization_loss(y_true, yhat):            
     delta_coord = tf.reduce_sum(tf.square(y_true[:,:2] - yhat[:,:2]))
@@ -303,25 +302,20 @@ def localization_loss(y_true, yhat):
     
     return delta_coord + delta_size
 
+
 classloss = tf.keras.losses.BinaryCrossentropy()
 regressloss = localization_loss
 
-# Testing out the loss metrics
-print(localization_loss(y[1], coords))
-print(classloss(y[0], classes))
-print(regressloss(y[1], coords))
-
-# FaceTraceker model class
 class FaceTracker(Model): 
-    def __init__(self, facetracker,  **kwargs): 
+    def __init__(self, eyetracker,  **kwargs): 
         super().__init__(**kwargs)
-        self.model = facetracker
+        self.model = eyetracker
 
-    def compile(self, optimizer, classloss, localizationloss, **kwargs):
+    def compile(self, opt, classloss, localizationloss, **kwargs):
         super().compile(**kwargs)
         self.closs = classloss
         self.lloss = localizationloss
-        self.optimizer = optimizer
+        self.opt = opt
     
     def train_step(self, batch, **kwargs): 
         
@@ -337,7 +331,7 @@ class FaceTracker(Model):
             
             grad = tape.gradient(total_loss, self.model.trainable_variables)
         
-        optimizer.apply_gradients(zip(grad, self.model.trainable_variables))
+        opt.apply_gradients(zip(grad, self.model.trainable_variables))
         
         return {"total_loss":total_loss, "class_loss":batch_classloss, "regress_loss":batch_localizationloss}
     
@@ -354,54 +348,35 @@ class FaceTracker(Model):
         
     def call(self, X, **kwargs): 
         return self.model(X, **kwargs)
-
-# Build the model using the build_model function
+        
 model = FaceTracker(facetracker)
-model.compile(optimizer, classloss, regressloss)
+model.compile(opt, classloss, regressloss)
 
-# Train the model using fit method
 logdir='logs'
 tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=logdir)
 hist = model.fit(train, epochs=1, validation_data=val, callbacks=[tensorboard_callback])
 
-fig, ax = plt.subplots(ncols=3, figsize=(20, 5))
+fig, ax = plt.subplots(ncols=3, figsize=(20,5))
 
-# Plotting Total Loss
-ax[0].plot(hist.history['total_loss'], label='Training Loss')
-ax[0].plot(hist.history['val_total_loss'], label='Validation Loss')
-ax[0].set_title('Total Loss')
-ax[0].set_xlabel('Epoch')
-ax[0].set_ylabel('Loss')
+ax[0].plot(hist.history['total_loss'], color='teal', label='loss')
+ax[0].plot(hist.history['val_total_loss'], color='orange', label='val loss')
+ax[0].title.set_text('Total Loss')
 ax[0].legend()
 
-# Plotting Classification Loss
-ax[1].plot(hist.history['class_loss'], label='Training Class Loss')
-ax[1].plot(hist.history['val_class_loss'], label='Validation Class Loss')
-ax[1].set_title('Classification Loss')
-ax[1].set_xlabel('Epoch')
-ax[1].set_ylabel('Loss')
+ax[1].plot(hist.history['class_loss'], color='teal', label='class loss')
+ax[1].plot(hist.history['val_class_loss'], color='orange', label='val class loss')
+ax[1].title.set_text('Classification Loss')
 ax[1].legend()
 
-# Plotting Regression Loss
-ax[2].plot(hist.history['regress_loss'], label='Training Regression Loss')
-ax[2].plot(hist.history['val_regress_loss'], label='Validation Regression Loss')
-ax[2].set_title('Regression Loss')
-ax[2].set_xlabel('Epoch')
-ax[2].set_ylabel('Loss')
+ax[2].plot(hist.history['regress_loss'], color='teal', label='regress loss')
+ax[2].plot(hist.history['val_regress_loss'], color='orange', label='val regress loss')
+ax[2].title.set_text('Regression Loss')
 ax[2].legend()
-
-# Adding a main title to the entire graph
-fig.suptitle('Training and Validation Loss Over Epochs')
 
 plt.show()
 
-# Save the trained FaceTracker model to a file
-model.save('cnn_face_detection_model.keras')
-
-# Load the saved FaceTracker model from the file
+facetracker.save('cnn_face_detection_model.keras')
 facetracker = load_model('cnn_face_detection_model.keras')
-
-# Compile the loaded model with optimizer, loss functions, and metrics
 facetracker.compile(
     optimizer=tf.keras.optimizers.Adam(learning_rate=1e-4),
     loss={
