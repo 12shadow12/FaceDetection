@@ -377,6 +377,7 @@ tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=logdir)
 
 # facetracker.save('cnn_face_detection_model.keras')
 facetracker = load_model('cnn_face_detection_model.keras')
+
 facetracker.compile(
     optimizer=tf.keras.optimizers.Adam(learning_rate=1e-4),
     loss={
@@ -392,23 +393,47 @@ facetracker.compile(
     }
 )
 
-# making predictions on test set
+# Model Accuracy
 test_data = test.as_numpy_iterator()
-test_sample = test_data.next()
-yhat = facetracker.predict(test_sample[0])
-fig, ax = plt.subplots(ncols=4, figsize=(20,20))
-for idx in range(4): 
-    sample_image = test_sample[0][idx]
-    sample_coords = yhat[1][idx]
+true_labels = []
+predicted_labels = []
+
+for batch in test_data:
+    X_test, y_test = batch
+    predictions = facetracker.predict(X_test)
+    true_labels.extend(y_test[0])  #  y_test[0] contains the true class labels
+    predicted_labels.extend(predictions[0])  #  predictions[0] contains the predicted class labels
+
+# Convert the lists to numpy arrays for easier comparison
+true_labels = np.array(true_labels)
+predicted_labels = np.array(predicted_labels)
+
+# Convert predicted probabilities to binary predictions based on a threshold
+threshold = 0.5
+binary_predictions = (predicted_labels > threshold).astype(int)
+
+# Calculate accuracy
+accuracy = np.mean(true_labels == binary_predictions)
+print(f"Model Accuracy: {accuracy * 100:.2f}%")
+
+
+# making predictions on test set
+# test_data = test.as_numpy_iterator()
+# test_sample = test_data.next()
+# yhat = facetracker.predict(test_sample[0])
+# fig, ax = plt.subplots(ncols=4, figsize=(20,20))
+# for idx in range(4): 
+#     sample_image = test_sample[0][idx]
+#     sample_coords = yhat[1][idx]
     
-    if yhat[0][idx] > 0.9:
-        cv2.rectangle(sample_image, 
-                      tuple(np.multiply(sample_coords[:2], [120,120]).astype(int)),
-                      tuple(np.multiply(sample_coords[2:], [120,120]).astype(int)), 
-                            (255,0,0), 2)
+#     if yhat[0][idx] > 0.9:
+#         cv2.rectangle(sample_image, 
+#                       tuple(np.multiply(sample_coords[:2], [120,120]).astype(int)),
+#                       tuple(np.multiply(sample_coords[2:], [120,120]).astype(int)), 
+#                             (255,0,0), 2)
     
-    ax[idx].imshow(sample_image)
-plt.show()
+#     ax[idx].imshow(sample_image)
+# plt.show()
 
 # cap = cv2.VideoCapture(0)
 # while cap.isOpened():
@@ -446,3 +471,4 @@ plt.show()
 #         break
 # cap.release()
 # cv2.destroyAllWindows()
+
