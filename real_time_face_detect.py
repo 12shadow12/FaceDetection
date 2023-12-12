@@ -25,7 +25,7 @@ while cap.isOpened():
         cv2.rectangle(frame, 
                       tuple(np.multiply(sample_coords[:2], [450,450]).astype(int)),
                       tuple(np.multiply(sample_coords[2:], [450,450]).astype(int)), 
-                            (255,0,0), 2)
+                            (128,255,255), 2)
 
         # Controls the label rectangle
         cv2.rectangle(frame, 
@@ -38,7 +38,7 @@ while cap.isOpened():
         # Controls the text rendered
         cv2.putText(frame, 'face', tuple(np.add(np.multiply(sample_coords[:2], [450,450]).astype(int),
                                                [0,-5])),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1, (255,255,255), 2, cv2.LINE_AA)
+                    cv2.FONT_HERSHEY_COMPLEX, 1, (0,0,0), 2, cv2.LINE_AA)
     
     cv2.imshow('Facetrack', frame)
     

@@ -5,4 +5,7 @@
 3. Use the 'git clone https://github.com/12shadow12/FaceDetection' command to download all the project files from my GitHub.
 4. To get the program running with all its dependencies run: 
    pip install -r requirements.txt
+
+   note: if there issues with the dependencies delete the venv folder and create a new virtual environment using this command: python -m venv venv . Then try installing requirements.txt again from step 4.
+   
 5. Then execute and run the real_time_face_detect.py file
